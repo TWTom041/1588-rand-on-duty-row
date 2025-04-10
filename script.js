@@ -1,57 +1,29 @@
-function seededRandom(seed) {
-    let value = seed % 2147483647;
-    return () => {
-        value = (value * 16807) % 2147483647;
-        return (value - 1) / 2147483646;
-    };
-}
+// Modified JS code using Dart's deterministic Latin Square method for generating duty rosters
 
-function generateNonMatchingArray(seed) {
-    const n = 5;
-    const rng = seededRandom(seed);
-    const array = Array.from({ length: n }, () => Array(n).fill(undefined));
-
-    for (let row = 0; row < n; row++) {
-        for (let col = 0; col < n; col++) {
-            let availableDigits = [1, 2, 3, 4, 5];
-
-            for (let c = 0; c < col; c++) {
-                availableDigits = availableDigits.filter((d) => d !== array[row][c]);
-            }
-
-            for (let r = 0; r < row; r++) {
-                availableDigits = availableDigits.filter((d) => d !== array[r][col]);
-            }
-
-            if (availableDigits.length === 0) {
-                row = 0;
-                col = -1;
-                array.forEach((row) => row.fill(undefined));
-            } else {
-                const randomIndex = Math.floor(rng() * availableDigits.length);
-                array[row][col] = availableDigits[randomIndex];
-            }
-        }
-    }
-
-    return array;
-}
+// Define the deterministic Latin Square for a 5-week cycle
+const baseLatinSquare = [
+    [1, 2, 3, 4, 5], // Week 0
+    [2, 4, 1, 5, 3], // Week 1
+    [3, 5, 4, 2, 1], // Week 2
+    [4, 1, 5, 3, 2], // Week 3
+    [5, 3, 2, 1, 4]  // Week 4
+];
 
 function getMondayAndFridayDates() {
     const currentDate = new Date();
     const today = currentDate.getDay();
 
     const currentMondayDate = new Date(currentDate);
-    currentMondayDate.setDate(currentDate.getDate() - (today + 6) % 7 + (today === 0 ? 7 : 0));
+    currentMondayDate.setDate(currentDate.getDate() - ((today + 6) % 7) + (today === 0 ? 7 : 0));
 
     const currentFridayDate = new Date(currentDate);
-    currentFridayDate.setDate(currentDate.getDate() + (5 - today + 7) % 7);
+    currentFridayDate.setDate(currentDate.getDate() + ((5 - today + 7) % 7));
 
     const nextMondayDate = new Date(currentDate);
-    nextMondayDate.setDate(currentDate.getDate() + 7 - (today + 6) % 7 + (today === 0 ? 7 : 0));
+    nextMondayDate.setDate(currentDate.getDate() + 7 - ((today + 6) % 7) + (today === 0 ? 7 : 0));
 
     const nextFridayDate = new Date(currentDate);
-    nextFridayDate.setDate(currentDate.getDate() + 7 + (5 - today + 7) % 7);
+    nextFridayDate.setDate(currentDate.getDate() + 7 + ((5 - today + 7) % 7));
 
     const formatDate = (date) => {
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -67,17 +39,30 @@ function getMondayAndFridayDates() {
     };
 }
 
+function getCurrentDate() {
+    const currentDate = new Date();
+    const dayOfWeek = currentDate.getDay();
+    const month = currentDate.getMonth();
+    const date = currentDate.getDate();
+    const year = currentDate.getFullYear();
+    const xingchi = ["一", "二", "三", "四", "五", "六", "日"];
+    return `${year}/${month + 1}/${date} 星期${xingchi[(dayOfWeek + 6) % 7]}`;
+}
+
 function generateDutyRoster() {
     const currentDate = new Date();
-    const startDate = new Date(1970, 0, 4);
+    // Use January 5, 1970 (Monday) as the reference start date
+    const startDate = new Date(1970, 0, 5);
     const millisecondsPerWeek = 7 * 24 * 60 * 60 * 1000;
-    const weeksSince1970 = Math.floor((currentDate - startDate) / millisecondsPerWeek);
-    const week_seed = Math.floor(weeksSince1970 / 5);
-    const week_num = weeksSince1970 % 5;
+    const weeksSinceStart = Math.floor((currentDate - startDate) / millisecondsPerWeek);
 
-    const randomArray = generateNonMatchingArray(week_seed);
-    const currentWeekArray = randomArray[week_num];
-    const nextWeekArray = week_num === 4 ? generateNonMatchingArray(week_seed + 1)[0] : randomArray[week_num + 1];
+    // Determine the week numbers within the 5-week cycle
+    const weekNum = weeksSinceStart % 5;
+    const nextWeekNum = (weekNum + 1) % 5;
+
+    // Obtain the duty rosters directly from the predefined Latin Square
+    const currentWeekArray = baseLatinSquare[weekNum];
+    const nextWeekArray = baseLatinSquare[nextWeekNum];
 
     const { currentMonday, currentFriday, nextMonday, nextFriday } = getMondayAndFridayDates();
 
@@ -87,7 +72,7 @@ function generateDutyRoster() {
     const currentWeekRow = document.getElementById('currentWeekRow');
     const nextWeekRow = document.getElementById('nextWeekRow');
 
-    // Clear existing cells
+    // Clear existing cells (assuming the first cell is a header)
     while (currentWeekRow.cells.length > 1) {
         currentWeekRow.deleteCell(1);
     }
@@ -95,10 +80,14 @@ function generateDutyRoster() {
         nextWeekRow.deleteCell(1);
     }
 
+    // Determine which day to highlight (only for weekdays, Mon-Fri)
+    const day = currentDate.getDay();
+    const currentDayIndex = (day >= 1 && day <= 5) ? day - 1 : -1;
+
     currentWeekArray.forEach((duty, index) => {
         const cell = currentWeekRow.insertCell();
         cell.textContent = duty;
-        if (index === currentDate.getDay() - 1) {
+        if (index === currentDayIndex) {
             cell.classList.add('highlight');
         }
     });
@@ -110,7 +99,7 @@ function generateDutyRoster() {
 
     document.getElementById('currentDate').textContent = getCurrentDate();
 
-    // Add animation to the cards
+    // Add fade-in animation to the cards
     const currentWeekCard = document.getElementById('currentWeekCard');
     const nextWeekCard = document.getElementById('nextWeekCard');
     currentWeekCard.classList.add('fade-in');
@@ -122,22 +111,11 @@ function generateDutyRoster() {
     }, 500);
 }
 
-function getCurrentDate() {
-    const currentDate = new Date();
-    const dayOfWeek = currentDate.getDay();
-    const month = currentDate.getMonth();
-    const date = currentDate.getDate();
-    const year = currentDate.getFullYear();
-    const xingchi = ["一", "二", "三", "四", "五", "六", "日"];
-
-    return `${year}/${month + 1}/${date} 星期${xingchi[(dayOfWeek + 6) % 7]}`;
-}
-
 async function discordAlert() {
     const url = "https://discordapp.com/api/webhooks/1187051179901976626/qU_ChQXtFUd_QtRv3SQ6azT5rhKJ0E8WtYVEyUsuszZ-a6-39YJKPyVaeQDJS_UP_LZ5";
     const currentDate = new Date();
     const dayOfWeek = currentDate.getDay();
-    
+
     if (dayOfWeek === 0 || dayOfWeek === 6) {
         alert("今天是週末，沒有值日生。");
         return;
@@ -159,7 +137,7 @@ async function discordAlert() {
     if (memes && memes.length > 0) {
         const totalWeight = memes.reduce((sum, meme) => sum + meme.pageview + meme.total_like_count, 0);
         let randomWeight = Math.random() * totalWeight;
-        
+
         for (let meme of memes) {
             randomWeight -= (meme.pageview + meme.total_like_count);
             if (randomWeight <= 0) {
@@ -235,13 +213,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add parallax effect to background
     document.addEventListener('mousemove', (e) => {
         const stars = document.querySelector('.stars');
-        const x = e.clientX / window.innerWidth;
-        const y = e.clientY / window.innerHeight;
-        stars.style.transform = `translate(${x * 50}px, ${y * 50}px)`;
+        if (stars) {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            stars.style.transform = `translate(${x * 50}px, ${y * 50}px)`;
+        }
     });
 
     // Easter egg: Konami code
-    let konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
+    const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
     let konamiIndex = 0;
 
     document.addEventListener('keydown', (e) => {
@@ -266,7 +246,7 @@ function activateEasterEgg() {
     }, 5000);
 }
 
-// Add this to your CSS
+// Append required CSS styles
 document.head.insertAdjacentHTML('beforeend', `
     <style>
         @keyframes rainbow-bg {
@@ -286,5 +266,9 @@ document.head.insertAdjacentHTML('beforeend', `
             from { opacity: 0; }
             to { opacity: 1; }
         }
+        .highlight {
+            background-color: yellow; /* Example highlight color */
+        }
     </style>
 `);
+
